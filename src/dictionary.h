@@ -46,7 +46,9 @@ class Dictionary {
     void addSubwords(std::vector<int32_t>&, const std::string&, int32_t) const;
 
     std::shared_ptr<Args> args_;
+    // 哈希表，线性探测法，保存相应词或标签在 word_ 数组中的地址
     std::vector<int32_t> word2int_;
+    // 保存了每个词和标签的详细信息
     std::vector<entry> words_;
 
     std::vector<real> pdiscard_;

@@ -37,6 +37,8 @@ int32_t Dictionary::find(const std::string& w) const {
   return find(w, hash(w));
 }
 
+// word2int_ 保存相应词或标签在word_数组中的地址
+// 线性探测法解决哈希冲突
 int32_t Dictionary::find(const std::string& w, uint32_t h) const {
   int32_t word2intsize = word2int_.size();
   int32_t id = h % word2intsize;
@@ -149,6 +151,7 @@ uint32_t Dictionary::hash(const std::string& str) const {
   return h;
 }
 
+// 把所有subword哈希到大小由参数bucket决定的哈希表中
 void Dictionary::computeSubwords(const std::string& word,
                                std::vector<int32_t>& ngrams,
                                std::vector<std::string>& substrings) const {
@@ -225,6 +228,7 @@ bool Dictionary::readWord(std::istream& in, std::string& word) const
   return !word.empty();
 }
 
+// 读取训练样本，构建词典
 void Dictionary::readFromFile(std::istream& in) {
   std::string word;
   int64_t minThreshold = 1;
@@ -252,15 +256,20 @@ void Dictionary::readFromFile(std::istream& in) {
   }
 }
 
+// 对于后续model模块能够快速构建Huffman树至关重要
+// words_数组的长度 size_ = nwords_ + nlabels_
 void Dictionary::threshold(int64_t t, int64_t tl) {
+  // 将word_数组按照count降序排列，且word排在lable前面
   sort(words_.begin(), words_.end(), [](const entry& e1, const entry& e2) {
       if (e1.type != e2.type) return e1.type < e2.type;
       return e1.count > e2.count;
     });
+  // 丢弃count太小的word和label
   words_.erase(remove_if(words_.begin(), words_.end(), [&](const entry& e) {
         return (e.type == entry_type::word && e.count < t) ||
                (e.type == entry_type::label && e.count < tl);
       }), words_.end());
+  // removal of unused capacity
   words_.shrink_to_fit();
   size_ = 0;
   nwords_ = 0;
@@ -274,9 +283,11 @@ void Dictionary::threshold(int64_t t, int64_t tl) {
   }
 }
 
+// 通过一定的概率随机丢弃“in”，“the”，“a”等对模型训练无助益的高频词
 void Dictionary::initTableDiscard() {
   pdiscard_.resize(size_);
   for (size_t i = 0; i < size_; i++) {
+    // f: 词频
     real f = real(words_[i].count) / real(ntokens_);
     pdiscard_[i] = std::sqrt(args_->t / f) + args_->t / f;
   }
@@ -290,6 +301,8 @@ std::vector<int64_t> Dictionary::getCounts(entry_type type) const {
   return counts;
 }
 
+// 计算文本的wordNgram的id
+// wordNgram的哈希由word的哈希计算而来
 void Dictionary::addWordNgrams(std::vector<int32_t>& line,
                                const std::vector<int32_t>& hashes,
                                int32_t n) const {
@@ -349,6 +362,10 @@ int32_t Dictionary::getLine(std::istream& in,
   return ntokens;
 }
 
+// 函数getLine()执行完毕后，数组words内存放着word/subword/wordNgram的id，数组labels内存放着label的id            
+// word的id的取值范围为 0 ~ nwords_ 
+// subword/wordNgram的id的取值范围为 nwords_ ~ (nwords_ + bucket)                                               
+// label的id的取值范围为 0 ~ nlabels_
 int32_t Dictionary::getLine(std::istream& in,
                             std::vector<int32_t>& words,
                             std::vector<int32_t>& labels) const {
